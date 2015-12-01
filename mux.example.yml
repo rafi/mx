@@ -1,0 +1,38 @@
+name: fun
+dir: /srv/code/
+venv: /Users/username/.local/share/python/2.7/envs/fun
+repos:
+  - torvalds/linux
+  - vim/vim
+  - tmux/tmux
+  - facebook/react
+  - twbs/bootstrap
+windows:
+- dev: ls
+- repos:
+    post_cmd: |
+      git status -sb &&
+      git --no-pager log -10 --graph --all --color=auto --date-order --relative-date --simplify-merges --simplify-by-decoration --pretty='%C(auto)%D%C(bold black)%gD%N %ad by %C(247)%cn%C(reset)'
+    panes:
+    - cd linux
+    - cd vim
+    - cd tmux
+    - cd react
+    - cd bootstrap
+- workers:
+    panes:
+    - cd linux && echo 'do something'
+    - cd vim && echo 'do something'
+    - cd tmux && echo 'do something'
+    - cd react && echo 'do something'
+    - cd bootstrap && echo 'do something'
+- database:
+    layout: even-horizontal
+    panes:
+    - ipython
+    - pgcli:
+      - pgcli -U postgres -h localhost -d fun
+      - SET search_path = public,foobar; \dn
+- docker:
+    panes:
+    - cd fun && eval "$(docker-machine env fun)" && docker-compose up
