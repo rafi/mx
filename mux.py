@@ -11,18 +11,26 @@ import argparse
 __author__ = "Rafael Bodill"
 __copyright__ = "Copyright (C) 2015 Rafael Bodill"
 __license__ = "MIT"
-__version__ = "0.1"
+__version__ = "0.2"
 
 
-class Logger():
+class Logger(object):
+    """
+    Terminal logger with color-support
+    """
     _is_tty = sys.stdout.isatty()
-
-    _colors = {
-        'reset': 0, 'black': 30, 'white': 37,
-        'cyan': 36, 'magenta': 35, 'blue': 34,
-        'yellow': 33, 'green': 32, 'red': 31}
+    _colors = {'reset': 0, 'black': 30, 'white': 37,
+               'cyan': 36, 'magenta': 35, 'blue': 34,
+               'yellow': 33, 'green': 32, 'red': 31}
 
     def echo(self, *args):
+        """
+        Prints text to terminal with color codes
+        Example:
+          log.echo('[green]hey [boldred]there!')
+
+        :param args: Multiple string messages
+        """
         for arg in args:
             msg = re.sub(r'\[(bold)?([a-z]+)\]', self._colorize, arg)
             print(msg, '\x1b[0m')
@@ -35,8 +43,19 @@ class Logger():
         return '\x1b[{}m'.format(';'.join(attr))
 
 
-class Tmux:
+class Tmux(object):
+    """
+    Tmux controller
+    """
     def command(self, cmd, formats=None, many=False):
+        """
+        Send custom Tmux command and return rich information
+
+        :param cmd:
+        :param formats:
+        :param many:
+        :return:
+        """
         cmd.insert(0, 'tmux')
         if formats:
             fmt = '{'
@@ -48,10 +67,7 @@ class Tmux:
 
         try:
             process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             process.wait()
             stdout = process.stdout.read()
             process.stdout.close()
@@ -60,16 +76,32 @@ class Tmux:
             if stdout:
                 lines = ','.join(stdout.decode('utf_8').split('\n')) \
                     .rstrip(',')
-                return json.loads('['+lines+']' if many else lines)
-        except subprocess.CalledProcessError:
-            print('Error')
+                stdout = json.loads('['+lines+']' if many else lines)
+            if stderr:
+                stderr = stderr.decode('utf_8').strip()
+
+            return stdout, stderr
+        except Exception as e:
+            log.echo('[red]ERROR: [reset]Unable to execute Tmux, aborting.')
+            print(repr(e))
+            sys.exit(3)
         except ValueError:
-            print('Error')
+            print('Unable to serialize Tmux\'s response, please report bug.')
+            print(repr(e))
+            sys.exit(4)
 
     def within_session(self):
+        """
+        Returns true if current within a Tmux session
+        """
         return os.environ.get('TMUX') != ''
 
     def has_session(self, session_name):
+        """
+        Returns true if specified session currently exists
+
+        :param session_name: The session name to match
+        """
         try:
             cmds = ['tmux', 'has-session', '-t', session_name]
             code = subprocess.check_call(cmds, stderr=subprocess.DEVNULL)
@@ -77,101 +109,25 @@ class Tmux:
             code = e.returncode
         return code == 0
 
+    def new_session(self, session_name, win_name=''):
+        """
+        Create a new Tmux session
 
-class Workspace(object):
-    _config = {}
-    _repos = []
-    _session = {}
-    _windows = []
-    _tmux = None
-
-    def __init__(self, config_filepath, tmux, log):
-        self._tmux = tmux
-        self._log = log
-        with open(config_filepath, 'r') as stream:
-            self._config = yaml.load(stream)
-
-        for repo_name in self._config.get('repos', []):
-            repo = {
-                'name': repo_name,
-                'url': 'https://github.com/{}.git'.format(repo_name),
-                'dir': repo_name.split('/')[1]
-            }
-            self._repos.append(repo)
-
-        venv = self._config.get('venv')
-        self._venv = [' source "{}/bin/activate"'.format(venv)] \
-            if venv else []
-
-    def create_windows(self):
-        root = self._config.get('dir')
-        if root:
-            os.chdir(root)
-        for win_schema in self._config.get('windows', []):
-            # Normalize window schema definition
-            if isinstance(win_schema, str):
-                win_name = win_schema
-            else:
-                win_name = next(iter(win_schema.keys()))
-                win_schema = win_schema[win_name] or {}
-
-            if isinstance(win_schema, str):
-                panes = [win_schema]
-                win_schema = {}
-            else:
-                panes = win_schema.get('panes', [])
-
-            layout = win_schema.get('layout')
-
-            # Normalize post commands
-            post_cmds = win_schema.get('post_cmd', [])
-            post_cmds = [post_cmds] if isinstance(post_cmds, str) \
-                else post_cmds
-
-            window = self._create_window(win_name, panes, post_cmds, layout)
-            self._windows.append(window)
-
-        return self._windows
-
-    def _create_window(self, name, panes, post_cmds, layout=None):
-        if len(self._windows) > 0:
-            window, pane = self._new_window(self._session['name'], name)
-        else:
-            self._session, window, pane = \
-                self._new_session(self._config.get('name'), name)
-            if not self._session:
-                print('Error creating session buddy.')
-                sys.exit(1)
-
-        session_name = self._session['name']
-        window['panes'] = []
-        for pane_schema in panes:
-            if len(window['panes']) > 0:
-                pane = self._new_pane(session_name, name, pane['index'])
-            window['panes'].append(pane)
-
-            # Run commands+post-commands, and activate virtualenv
-            cmds = next(iter(pane_schema.values())) \
-                if isinstance(pane_schema, dict) else [pane_schema]
-            cmds = self._venv + cmds + post_cmds
-            for cmd in cmds:
-                self.send_keys(session_name, name, pane['index'], cmd)
-
-        self.set_layout(session_name, name, layout)
-        return window
-
-    def _new_session(self, session_name, win_name=''):
+        :param session_name: New session's name
+        :param win_name: The window's name within the new session
+        :return: (session, window, pane)
+        """
         cmds = ['new-session', '-Pd', '-s', session_name]
         if win_name:
             cmds.extend(['-n', win_name])
 
-        output = self._tmux.command(
+        output, errors = self.command(
             cmds,
             ['session_id', 'session_name', 'session_windows',
              'window_id', 'window_index', 'pane_index', 'pane_id'])
 
-        if not output:
-            raise Exception('Error creating session')
+        if errors:
+            raise WorkspaceException('Error creating session', errors)
         session = {}
         window = {}
         pane = {}
@@ -186,18 +142,25 @@ class Workspace(object):
 
         return session, window, pane
 
-    def _new_window(self, session_name, win_name=''):
+    def new_window(self, session_name, win_name=''):
+        """
+        Create a new Tmux window
+
+        :param session_name: Target session name
+        :param win_name: The new window's name
+        :return: (window, pane)
+        """
         cmds = ['new-window', '-Pd', '-t', session_name]
         if win_name:
             cmds.extend(['-n', win_name])
 
-        output = self._tmux.command(
+        output, errors = self.command(
             cmds,
             ['window_id', 'window_name', 'window_panes', 'window_active',
              'window_index', 'window_layout', 'pane_index', 'pane_id'])
 
-        if not output:
-            raise Exception('Error creating window')
+        if errors:
+            raise Exception('Error creating window: {}'.format(errors))
         window = {}
         pane = {}
         for k, v in output.items():
@@ -209,58 +172,227 @@ class Workspace(object):
 
         return window, pane
 
-    def _new_pane(self, session_name, window_id, pane_id):
-        output = self._tmux.command(
+    def new_pane(self, session_name, window_id, pane_id):
+        """
+        Create a new Tmux pane
+
+        :param session_name: Target session name
+        :param window_id: Window to split from
+        :param pane_id: Pane to split from
+        :return: Pane information
+        """
+        output, errors = self.command(
             ['split-window', '-P', '-t',
              ':'.join([session_name, window_id])+'.'+str(pane_id), '-h'],
             ['pane_id', 'pane_index', 'pane_active', 'pane_current_path',
              'pane_start_command', 'pane_current_command', 'pane_title'])
-        if not output:
-            raise Exception('Error creating pane')
+        if errors:
+            raise WorkspaceException('Error creating pane {}'.format(errors))
         pane = {}
         for k, v in output.items():
             short_name = k.split('_')[1]
             pane[short_name] = v
         return pane
 
-    def get_session_name(self):
-        return self._config.get('name')
-
-    def get_windows(self, session_name):
-        return self._tmux.command(
-            ['list-windows', '-t', session_name],
-            ['window_id', 'window_name', 'window_panes', 'window_active',
-             'window_index', 'window_layout'],
-            many=True)
-
-    def get_panes(self, session_name, window_name):
-        return self._tmux.command(
-            ['list-panes', '-t', ':'.join([session_name, window_name])],
-            ['pane_id', 'pane_active', 'pane_index', 'pane_start_command',
-             'pane_current_command', 'pane_current_path', 'pane_title'],
-            many=True)
+    def kill_session(self, session_name):
+        """
+        Kill a specified Tmux session
+        """
+        return self.command(['kill-session', '-t', session_name])
 
     def set_layout(self, session_name, win_name, layout=None):
-        return self._tmux.command([
+        """
+        Sets a Tmux session's specific window to a different layout
+
+        :param session_name: Target session name
+        :param win_name: Target window name
+        :param layout: The layout name (even-horizontal, even-vertical,
+                                        main-horizontal, main-vertical, tiled)
+        """
+        return self.command([
             'select-layout', '-t',
             session_name+':'+win_name, layout or 'tiled'
         ])
 
     def send_keys(self, session_name, win_name, pane_index, cmd, enter=True):
+        """
+        Sends a Tmux session custom keys
+
+        :param session_name: Target session name
+        :param win_name: Target window name
+        :param pane_index: Target pane index
+        :param cmd: The string to enter
+        :param enter: Finish with a carriage-return?
+        """
         if cmd:
-            return self._tmux.command([
+            return self.command([
                 'send-keys', '-Rt',
                 session_name+':'+win_name+'.'+str(pane_index),
                 cmd, 'C-m' if enter else ''
             ])
 
     def attach(self, session_name):
+        """
+        Attach to an existing Tmux session
+
+        :param session_name: Target session name
+        """
         if session_name:
-            cmd = 'switch-client' if self.tmux.within_session() \
+            cmd = 'switch-client' if self.within_session() \
                 else 'attach-session'
-            return self._tmux.command([cmd, '-t', session_name])
+            return self.command([cmd, '-t', session_name])
+
+    def get_windows(self, session_name):
+        """
+        Retrieve information for all windows in a session
+
+        :param session_name: Target session name
+        """
+        return self.command(
+            ['list-windows', '-t', session_name],
+            ['window_id', 'window_name', 'window_panes', 'window_active',
+             'window_index', 'window_layout'],
+            many=True)
+
+    def get_panes(self, session_name, window_name):
+        """
+        Retrieve information for all panes in a window
+
+        :param session_name: Target session name
+        :param window_name: Target window name
+        """
+        return self.command(
+            ['list-panes', '-t', ':'.join([session_name, window_name])],
+            ['pane_id', 'pane_active', 'pane_index', 'pane_start_command',
+             'pane_current_command', 'pane_current_path', 'pane_title'],
+            many=True)
+
+
+class Workspace(object):
+    _config = {}
+    _tmux = None
+    _venv = []
+    _session = {}
+    _windows = []
+
+    def __init__(self, tmux):
+        """
+        :param tmux: Tmux class instance
+        """
+        self._tmux = tmux
+
+    def set_config(self, config):
+        self._config = config
+
+        # Prepare a virtualenv source command, if any
+        venv = self._config.get('venv')
+        if venv:
+            self._venv = [' source "{}/bin/activate"'.format(venv)]
+
+    def create(self):
+        """
+        Create Tmux windows from `windows` configuration in YML
+
+        :return Collection of window information
+        """
+        root = self._config.get('dir')
+        if root:
+            os.chdir(root)
+        for window in self._config.get('windows', []):
+            # Normalize window schema definition
+            if isinstance(window, str):
+                name = window
+            else:
+                name = next(iter(window.keys()))
+                window = window[name] or {}
+
+            if isinstance(window, str):
+                panes = [window]
+                window = {}
+            else:
+                panes = window.get('panes', [])
+
+            # Normalize post commands
+            post_cmds = window.get('post_cmd', [])
+            post_cmds = [post_cmds] if isinstance(post_cmds, str) \
+                else post_cmds
+
+            self._windows.append(
+                self.create_window(
+                    name, panes, post_cmds, window.get('layout')))
+
+        return self._windows
+
+    def create_window(self, name, panes, post_cmds, layout=None):
+        """
+        Create Tmux window and panes from configuration
+
+        :param name:
+        :param panes:
+        :param post_cmds:
+        :param layout:
+        :return
+        """
+        if len(self._windows) > 0:
+            window, pane = self._tmux.new_window(self._session['name'], name)
+        else:
+            self._session, window, pane = \
+                self._tmux.new_session(self._config.get('name'), name)
+            if not self._session:
+                print('Error creating session buddy.')
+                sys.exit(1)
+
+        session_name = self._session['name']
+        window['panes'] = []
+        for pane_schema in panes:
+            if len(window['panes']) > 0:
+                pane = self._tmux.new_pane(session_name, name, pane['index'])
+            window['panes'].append(pane)
+
+            # Run commands+post-commands, and activate virtualenv
+            cmds = next(iter(pane_schema.values())) \
+                if isinstance(pane_schema, dict) else [pane_schema]
+            cmds = self._venv + cmds + post_cmds
+            for cmd in cmds:
+                self._tmux.send_keys(session_name, name, pane['index'], cmd)
+
+        self._tmux.set_layout(session_name, name, layout)
+        return window
+
+    def get_session_name(self):
+        return self._config.get('name')
+
+
+class WorkspaceException(Exception):
+    def __init__(self, message, errors):
+        super(WorkspaceException, self).__init__(message)
+        self.errors = errors
+        self.message = message
+
+
+class Git(object):
+    _config = {}
+    _repos = []
+
+    def __init__(self, config):
+        """
+        :param config: Dictionary with config schema
+        """
+        self._config = config
+
+        # Collect normalized list of repositories in workspace
+        for repo_name in self._config.get('repos', []):
+            repo = {
+                'name': repo_name,
+                'url': 'https://github.com/{}.git'.format(repo_name),
+                'dir': repo_name.split('/')[1]
+            }
+            self._repos.append(repo)
 
     def fetch(self):
+        """
+        Iterate through all repositories and run git fetch with rich output
+        """
         root = self._config.get('dir') or os.getcwd()
         log.echo(' [blue]::[reset] Fetching git index for project at [white]{}'
                  .format(root))
@@ -278,10 +410,14 @@ class Workspace(object):
                 ['git', 'fetch', '--all', '--tags', '--prune'],
                 stderr=subprocess.STDOUT
             )
-            output = output.decode('utf_8')
-            self._parse_git_fetch(output)
+            self._parse_git_fetch(output.decode('utf_8'))
 
     def _parse_git_fetch(self, output):
+        """
+        Parse and beautify git's raw fetch summary
+
+        :param output: Git's raw fetch output
+        """
         branches = {'created': [], 'updated': []}
         tags = {'created': [], 'updated': []}
         deleted = []
@@ -319,7 +455,7 @@ class Workspace(object):
             if tags[action] or branches[action]:
                 log.echo('   [{}]::[reset] {}'
                          ' {}[yellow]([boldyellow]{}[yellow])[reset]'
-                         ' {}[yellow]([boldmagenta]{}[yellow])[reset]'
+                         ' {}[yellow]([boldred]{}[yellow])[reset]'
                          .format(
                             'green' if action == 'created' else 'yellow',
                             action.title(),
@@ -333,6 +469,9 @@ class Workspace(object):
                      .format(', '.join(deleted)))
 
     def status(self):
+        """
+        Iterate through repositories and display a colorful status
+        """
         is_on = tmux.has_session(session_name)
         log.echo(' [blue]::[reset] Session [boldyellow]{}[reset]: {}'
                  .format(session_name,
@@ -416,21 +555,43 @@ args = parser.parse_args()
 
 log = Logger()
 tmux = Tmux()
+cache_dir = os.environ.get('XDG_CACHE_HOME',
+                           '{}/.cache'.format(os.environ.get('HOME')))
+pool_dir = '{}/mux'.format(cache_dir)
+
 if args.session:
-    # TODO load workspace yml
-    session_name = args.session
-    pool_dir = '/'.join([os.environ.get('XDG_CACHE_HOME', '~/.cache'), 'mux'])
-    if not os.path.isdir(pool_dir):
-        os.makedirs(pool_dir)
+    # Load session from cache pool (symlinks)
+    cfg_path = '{}/{}.yml'.format(pool_dir, args.session)
 else:
-    workspace = Workspace(args.config, tmux, log)
-    session_name = workspace.get_session_name()
+    # Load session from cli option (or default value)
+    cfg_path = os.path.realpath(args.config)
+
+if not os.path.isfile(cfg_path):
+    log.echo('[red]ERROR: [reset]Unable to find [white]{}'.format(cfg_path))
+    sys.exit(2)
+
+with open(cfg_path, 'r') as stream:
+    config = yaml.load(stream)
+workspace = Workspace(tmux)
+workspace.set_config(config)
+session_name = workspace.get_session_name()
 
 if args.action == 'start':
-    windows = workspace.create_windows()
+    try:
+        workspace.create()
+
+        # Save session symlink in cache pool
+        if not os.path.isdir(pool_dir):
+            os.makedirs(pool_dir)
+        link = '{}/{}.yml'.format(pool_dir, session_name)
+        if not os.path.isfile(link):
+            os.symlink(cfg_path, link)
+    except WorkspaceException as e:
+        log.echo('[red]{}: [reset]{}'.format(e.message, e.errors))
+
 elif args.action == 'stop':
-    output = tmux.command(['kill-session', '-t', session_name])
-elif args.action == 'status':
-    workspace.status()
-elif args.action == 'fetch':
-    workspace.fetch()
+    tmux.kill_session(session_name)
+
+elif args.action in ['status', 'fetch']:
+    git = Git(config)
+    getattr(git, args.action)()
