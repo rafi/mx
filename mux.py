@@ -287,7 +287,8 @@ class Workspace(object):
         # Prepare a virtualenv source command, if any
         venv = self._config.get('venv')
         if venv:
-            self._venv = [' source "{}/bin/activate"'.format(venv)]
+            self._venv = [
+                ' source "{}"'.format(os.path.join(venv, 'bin/activate'))]
 
     def create(self):
         """
@@ -297,6 +298,8 @@ class Workspace(object):
         """
         root = self._config.get('dir')
         if root:
+            if not os.path.isdir(root):
+                raise WorkspaceException('Directory does not exist', root)
             os.chdir(root)
         for window in self._config.get('windows', []):
             # Normalize window schema definition
@@ -364,7 +367,7 @@ class Workspace(object):
 
 
 class WorkspaceException(Exception):
-    def __init__(self, message, errors):
+    def __init__(self, message, errors=''):
         super(WorkspaceException, self).__init__(message)
         self.errors = errors
         self.message = message
@@ -373,12 +376,14 @@ class WorkspaceException(Exception):
 class Git(object):
     _config = {}
     _repos = []
+    _root = ''
 
     def __init__(self, config):
         """
         :param config: Dictionary with config schema
         """
         self._config = config
+        self._root = self._config.get('dir') or os.getcwd()
 
         # Collect normalized list of repositories in workspace
         for repo_name in self._config.get('repos', []):
@@ -393,9 +398,8 @@ class Git(object):
         """
         Iterate through all repositories and run git fetch with rich output
         """
-        root = self._config.get('dir') or os.getcwd()
         log.echo(' [blue]::[reset] Fetching git index for project at [white]{}'
-                 .format(root))
+                 .format(self._root))
 # Debugging:
 #        with open('output_example.txt') as f:
 #            output = f.read()
@@ -404,7 +408,7 @@ class Git(object):
         for repo in self._repos:
             log.echo(' [blue]::[reset] Fetching [white]{} [boldblack]@ {}'
                      .format(repo['name'], repo['url']))
-            os.chdir(root)
+            os.chdir(self._root)
             os.chdir(repo['dir'])
             output = subprocess.check_output(
                 ['git', 'fetch', '--all', '--tags', '--prune'],
@@ -477,9 +481,8 @@ class Git(object):
                  .format(session_name,
                          '[boldgreen]on' if is_on else '[boldred]off'))
 
-        root = self._config.get('dir') or os.getcwd()
         for repo in self._repos:
-            os.chdir(root)
+            os.chdir(self._root)
             os.chdir(repo['dir'])
 
             try:
@@ -510,6 +513,7 @@ class Git(object):
                 output = subprocess.check_output([
                     'git', 'rev-parse', '--abbrev-ref', 'HEAD'])
                 branch = output.decode('utf-8').strip()
+                upstream = None
                 try:
                     output = subprocess.check_output(
                         ['git', 'rev-parse', '--abbrev-ref', '@{upstream}'],
@@ -556,12 +560,12 @@ args = parser.parse_args()
 log = Logger()
 tmux = Tmux()
 cache_dir = os.environ.get('XDG_CACHE_HOME',
-                           '{}/.cache'.format(os.environ.get('HOME')))
-pool_dir = '{}/mux'.format(cache_dir)
+                           os.path.join(os.environ.get('HOME'), '.cache'))
+pool_dir = os.path.join(cache_dir, 'mux')
 
 if args.session:
     # Load session from cache pool (symlinks)
-    cfg_path = '{}/{}.yml'.format(pool_dir, args.session)
+    cfg_path = os.path.join(pool_dir, args.session+'.yml')
 else:
     # Load session from cli option (or default value)
     cfg_path = os.path.realpath(args.config)
@@ -583,7 +587,7 @@ if args.action == 'start':
         # Save session symlink in cache pool
         if not os.path.isdir(pool_dir):
             os.makedirs(pool_dir)
-        link = '{}/{}.yml'.format(pool_dir, session_name)
+        link = os.path.join(pool_dir, session_name+'.yml')
         if not os.path.isfile(link):
             os.symlink(cfg_path, link)
     except WorkspaceException as e:
