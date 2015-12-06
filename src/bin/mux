@@ -1,0 +1,65 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+import yaml
+import argparse
+import os
+import sys
+from mux.logger import Logger
+from mux.tmux import Tmux
+from mux.git import Git
+from mux.workspace import Workspace, WorkspaceException
+
+# Compute cache pool path
+cache_dir = os.environ.get('XDG_CACHE_HOME',
+                           os.path.join(os.environ.get('HOME'), '.cache'))
+pool_dir = os.path.join(cache_dir, 'mux')
+
+# Start main program and parse user arguments
+parser = argparse.ArgumentParser(description='mux: Orchestrate tmux sessions')
+parser.add_argument('action', type=str, default='start',
+                    choices=['start', 'fetch', 'stop', 'status'],
+                    help='an action for %(prog)s (default: %(default)s)')
+parser.add_argument('session', type=str, nargs='?',
+                    help='session for %(prog)s to load'
+                    ' (default: current directory\'s mux.yml)')
+parser.add_argument('--config', type=str, default='mux.yml',
+                    help='workspace yml config file (default: %(default)s)')
+
+args = parser.parse_args()
+if args.session:
+    # Load session from cache pool (symlinks)
+    cfg_path = os.path.join(pool_dir, args.session+'.yml')
+else:
+    # Load session from cli option (or default value)
+    cfg_path = os.path.realpath(args.config)
+
+# Read configuration and initiate workspace object
+log = Logger()
+if not os.path.isfile(cfg_path):
+    log.echo('[red]ERROR: [reset]Unable to find [white]{}'.format(cfg_path))
+    sys.exit(2)
+with open(cfg_path, 'r') as stream:
+    config = yaml.load(stream)
+tmux = Tmux()
+workspace = Workspace(tmux)
+workspace.set_config(config)
+session_name = config.get('name')
+
+# Execute tmux workspace related actions
+if args.action in ['start', 'stop']:
+    # Start a tmux workspace
+    # Save session symlink in cache pool
+    try:
+        getattr(workspace, args.action)()
+        if not os.path.isdir(pool_dir):
+            os.makedirs(pool_dir)
+        link = os.path.join(pool_dir, session_name+'.yml')
+        if not os.path.isfile(link):
+            os.symlink(cfg_path, link)
+    except WorkspaceException as e:
+        log.echo('[red]{}: [reset]{}'.format(e.message, e.errors))
+
+# Execute git related actions
+elif args.action in ['status', 'fetch']:
+    git = Git(config)
+    getattr(git, args.action)()
