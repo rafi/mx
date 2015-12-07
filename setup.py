@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 MAJOR_VERSION = '0'
 MINOR_VERSION = '2'
-MICRO_VERSION = '4'
+MICRO_VERSION = '5'
 VERSION = '{}.{}.{}'.format(MAJOR_VERSION, MINOR_VERSION, MICRO_VERSION)
 
 setup(
@@ -10,8 +10,8 @@ setup(
     version=VERSION,
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    scripts=['src/bin/mux'],
     install_requires=['PyYAML'],
+    extras_requires=['pytest', 'mock'],
     platforms='any',
     author='Rafael Bodill',
     author_email='justrafi@gmail.com',
@@ -21,9 +21,11 @@ setup(
     url='http://github.com/rafi/mux2',
     zip_safe=False,
     entry_points={
-        'console_scripts': ['mux2 = mux.mux:main']
+        'console_scripts': ['mux = mux.cli:main']
     },
     classifiers=[
+        'Development Status :: 3 - Alpha',
+        'License :: OSI Approved :: MIT License',
         'Environment :: Console',
         'Intended Audience :: Developers',
         'Intended Audience :: Customer Service',

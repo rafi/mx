@@ -3,9 +3,12 @@ import json
 import os
 import subprocess
 from .logger import Logger
-from .workspace import WorkspaceException
 
 log = Logger()
+
+
+class TmuxException(Exception):
+    pass
 
 
 class Tmux(object):
@@ -41,18 +44,16 @@ class Tmux(object):
             if stdout:
                 lines = ','.join(stdout.decode('utf_8').split('\n')) \
                     .rstrip(',')
-                stdout = json.loads('['+lines+']' if many else lines)
+                stdout = json.loads('[' + lines + ']' if many else lines)
             if stderr:
                 stderr = stderr.decode('utf_8').strip()
 
             return stdout, stderr
-        except Exception as e:
-            print(repr(e))
-            raise WorkspaceException('Unable to execute Tmux, aborting.')
         except ValueError:
-            print(repr(e))
-            raise WorkspaceException('Unable to serialize Tmux\'s response, '
-                                     'please report bug.')
+            raise TmuxException('Unable to serialize Tmux\'s response, '
+                                'please report bug.')
+        except Exception:
+            raise TmuxException('Unable to execute Tmux, aborting.')
 
     def within_session(self):
         """
@@ -91,7 +92,7 @@ class Tmux(object):
              'window_id', 'window_index', 'pane_index', 'pane_id'])
 
         if errors:
-            raise WorkspaceException('Error creating session', errors)
+            raise TmuxException(errors)
         session = {}
         window = {}
         pane = {}
@@ -146,12 +147,12 @@ class Tmux(object):
         :return: Pane information
         """
         output, errors = self.command(
-            ['split-window', '-P', '-t',
-             ':'.join([session_name, window_id])+'.'+str(pane_id), '-h'],
+            ['split-window', '-h', '-P', '-t',
+             '{}:{}.{}'.format(session_name, window_id, str(pane_id))],
             ['pane_id', 'pane_index', 'pane_active', 'pane_current_path',
              'pane_start_command', 'pane_current_command', 'pane_title'])
         if errors:
-            raise WorkspaceException('Error creating pane {}'.format(errors))
+            raise TmuxException(errors)
         pane = {}
         for k, v in output.items():
             short_name = k.split('_')[1]
@@ -175,7 +176,7 @@ class Tmux(object):
         """
         return self.command([
             'select-layout', '-t',
-            session_name+':'+win_name, layout or 'tiled'
+            '{}:{}'.format(session_name, win_name), layout or 'tiled'
         ])
 
     def send_keys(self, session_name, win_name, pane_index, cmd, enter=True):
@@ -191,7 +192,7 @@ class Tmux(object):
         if cmd:
             return self.command([
                 'send-keys', '-Rt',
-                session_name+':'+win_name+'.'+str(pane_index),
+                '{}:{}.{}'.format(session_name, win_name, str(pane_index)),
                 cmd, 'C-m' if enter else ''
             ])
 

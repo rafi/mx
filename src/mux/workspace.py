@@ -2,6 +2,7 @@
 import sys
 import os
 from .logger import Logger
+from .tmux import Tmux
 
 log = Logger()
 
@@ -14,19 +15,19 @@ class WorkspaceException(Exception):
 
 
 class Workspace(object):
+    _tmux = Tmux()
     _config = {}
-    _tmux = None
     _name = ''
     _root = ''
     _venv = []
     _session = {}
     _windows = []
 
-    def __init__(self, tmux):
+    def __init__(self, config=None):
         """
         :param tmux: Tmux class instance
         """
-        self._tmux = tmux
+        self.set_config(config)
 
     def set_config(self, config):
         self._config = config
@@ -82,6 +83,7 @@ class Workspace(object):
                 self.create_window(
                     name, panes, post_cmds, window.get('layout')))
 
+        self.attach()
         return self._windows
 
     def stop(self, name=None):
@@ -107,7 +109,7 @@ class Workspace(object):
         windows, errors = self._tmux.get_windows(self._name)
         if errors:
             raise WorkspaceException('Unable to list windows', errors)
-        log.echo(' :: Windows:')
+        log.echo(' [blue]::[reset] Windows:')
         log.echo(repr(windows))
 
         for window in windows:
@@ -115,7 +117,7 @@ class Workspace(object):
             panes, errors = self._tmux.get_panes(self._name, win_id)
             if errors:
                 raise WorkspaceException('Unable to list panes', errors)
-            log.echo(' :: Window "{}" panes:'.format(win_id))
+            log.echo(' [blue]::[reset] Window "{}" panes:'.format(win_id))
             log.echo(repr(panes))
 
     def create_window(self, name, panes, post_cmds, layout=None):

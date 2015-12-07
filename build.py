@@ -1,8 +1,8 @@
 import subprocess
 import re
 
-commit_count = subprocess.check_output(['git', 'rev-list', '--all']) \
-                    .decode('utf-8').count('\n')
+rev_list = subprocess.check_output(['git', 'rev-list', '--all'])
+commit_count = rev_list.decode('utf-8').count('\n')
 
 with open('setup.py') as f:
     setup = f.read()

@@ -96,12 +96,12 @@ class Git(object):
                          ' {}[yellow]([boldyellow]{}[yellow])[reset]'
                          ' {}[yellow]([boldred]{}[yellow])[reset]'
                          .format(
-                            'green' if action == 'created' else 'yellow',
-                            action.title(),
-                            'tags: ' if tags[action] else '',
-                            ', '.join(tags[action]),
-                            'branches: ' if branches[action] else '',
-                            ', '.join(branches[action])))
+                             'green' if action == 'created' else 'yellow',
+                             action.title(),
+                             'tags: ' if tags[action] else '',
+                             ', '.join(tags[action]),
+                             'branches: ' if branches[action] else '',
+                             ', '.join(branches[action])))
         if deleted:
             log.echo('   [red]::[reset] Deleted:'
                      ' [yellow]([boldred]{}[yellow])[reset]'
@@ -131,13 +131,13 @@ class Git(object):
 
             output = subprocess.check_output(['git', 'diff', '--shortstat'])
             modified = re.match(r'^\s*(\d)', output.decode('utf_8'))
-            modified = '≠'+str(modified.group(1)) if modified else ''
+            modified = '≠' + str(modified.group(1)) if modified else ''
 
             output = subprocess.check_output(
                 ['git', 'ls-files', '--others', '--exclude-standard'],
                 stderr=subprocess.DEVNULL).decode('utf-8')
             untracked = len(output.split('\n')) - 1
-            untracked = '?'+str(untracked) if untracked > 0 else ''
+            untracked = '?' + str(untracked) if untracked > 0 else ''
 
             current = subprocess.check_output([
                 'git', 'log', '-1', '--color=always',
@@ -168,13 +168,13 @@ class Git(object):
                 ahead = len(re.findall(r'\<', output))
                 behind = len(re.findall(r'\>', output))
                 position = '{}{}'.format(
-                    '▲'+str(ahead) if ahead else '',
-                    '▼'+str(behind) if behind else '',
+                    '▲' + str(ahead) if ahead else '',
+                    '▼' + str(behind) if behind else '',
                 )
 
             log.echo('   [white]{:>30} '
                      ' [boldred]{:3} [boldblue]{:3} [boldmagenta]{:7}'
                      ' [reset]{}'
                      .format(
-                        repo['name'], modified, untracked,
-                        position if not detached else 'detach', current))
+                         repo['name'], modified, untracked,
+                         position if not detached else 'detach', current))
