@@ -47,11 +47,12 @@ class Tmux(object):
 
             return stdout, stderr
         except Exception as e:
-            log.echo('[red]ERROR: [reset]Unable to execute Tmux, aborting.')
             print(repr(e))
+            raise WorkspaceException('Unable to execute Tmux, aborting.')
         except ValueError:
-            print('Unable to serialize Tmux\'s response, please report bug.')
             print(repr(e))
+            raise WorkspaceException('Unable to serialize Tmux\'s response, '
+                                     'please report bug.')
 
     def within_session(self):
         """

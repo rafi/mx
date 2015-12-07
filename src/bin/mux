@@ -4,10 +4,13 @@ import yaml
 import argparse
 import os
 import sys
+from mux import __version__
 from mux.logger import Logger
 from mux.tmux import Tmux
 from mux.git import Git
 from mux.workspace import Workspace, WorkspaceException
+
+commands = ['attach', 'start', 'fetch', 'stop', 'status', 'ls']
 
 # Compute cache pool path
 cache_dir = os.environ.get('XDG_CACHE_HOME',
@@ -16,14 +19,15 @@ pool_dir = os.path.join(cache_dir, 'mux')
 
 # Start main program and parse user arguments
 parser = argparse.ArgumentParser(description='mux: Orchestrate tmux sessions')
-parser.add_argument('action', type=str, default='start',
-                    choices=['start', 'fetch', 'stop', 'status'],
+parser.add_argument('action', type=str, default='start', choices=commands,
                     help='an action for %(prog)s (default: %(default)s)')
 parser.add_argument('session', type=str, nargs='?',
                     help='session for %(prog)s to load'
                     ' (default: current directory\'s mux.yml)')
 parser.add_argument('--config', type=str, default='mux.yml',
                     help='workspace yml config file (default: %(default)s)')
+parser.add_argument('-v', action='version',
+                    version='%(prog)s {}'.format(__version__))
 
 args = parser.parse_args()
 if args.session:
@@ -33,11 +37,12 @@ else:
     # Load session from cli option (or default value)
     cfg_path = os.path.realpath(args.config)
 
-# Read configuration and initiate workspace object
 log = Logger()
 if not os.path.isfile(cfg_path):
     log.echo('[red]ERROR: [reset]Unable to find [white]{}'.format(cfg_path))
     sys.exit(2)
+
+# Read configuration and initiate workspace object
 with open(cfg_path, 'r') as stream:
     config = yaml.load(stream)
 tmux = Tmux()
@@ -46,11 +51,11 @@ workspace.set_config(config)
 session_name = config.get('name')
 
 # Execute tmux workspace related actions
-if args.action in ['start', 'stop']:
-    # Start a tmux workspace
-    # Save session symlink in cache pool
+if args.action in ['attach', 'start', 'stop', 'ls']:
     try:
         getattr(workspace, args.action)()
+
+        # Save session symlink in cache pool
         if not os.path.isdir(pool_dir):
             os.makedirs(pool_dir)
         link = os.path.join(pool_dir, session_name+'.yml')
@@ -58,6 +63,7 @@ if args.action in ['start', 'stop']:
             os.symlink(cfg_path, link)
     except WorkspaceException as e:
         log.echo('[red]{}: [reset]{}'.format(e.message, e.errors))
+        sys.exit(3)
 
 # Execute git related actions
 elif args.action in ['status', 'fetch']:

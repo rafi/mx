@@ -1,11 +1,23 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+from .logger import Logger
+
+log = Logger()
+
+
+class WorkspaceException(Exception):
+    def __init__(self, message, errors=''):
+        super(WorkspaceException, self).__init__(message)
+        self.errors = errors
+        self.message = message
 
 
 class Workspace(object):
     _config = {}
     _tmux = None
+    _name = ''
+    _root = ''
     _venv = []
     _session = {}
     _windows = []
@@ -18,15 +30,16 @@ class Workspace(object):
 
     def set_config(self, config):
         self._config = config
+        self._name = self._config.get('name')
+        self._root = self._config.get('dir')
 
         # Prepare a virtualenv source command, if any
         # The specified virtualenv path can be absolute or relative
         # to the workspace's root directory.
-        root = self._config.get('dir')
         venv = self._config.get('venv')
         if venv:
-            if root and not os.path.isabs(venv):
-                venv = os.path.join(root, venv)
+            if self._root and not os.path.isabs(venv):
+                venv = os.path.join(self._root, venv)
             self._venv = [
                 ' source "{}"'.format(os.path.join(venv, 'bin/activate'))]
 
@@ -36,11 +49,11 @@ class Workspace(object):
 
         :return Collection of window information
         """
-        root = self._config.get('dir')
-        if root:
-            if not os.path.isdir(root):
-                raise WorkspaceException('Directory does not exist', root)
-            os.chdir(root)
+        if self._root:
+            if not os.path.isdir(self._root):
+                raise WorkspaceException('Directory does not exist',
+                                         self._root)
+            os.chdir(self._root)
         for window in self._config.get('windows', []):
             # Normalize window schema definition, a window definition:
             #   - string - window name
@@ -75,9 +88,35 @@ class Workspace(object):
         """
         Kill a workspace session
 
-        :param name:
+        :param name: Session name
         """
-        self._tmux.kill_session(name or self._session['name'])
+        self._tmux.kill_session(name or self._name)
+
+    def attach(self, name=None):
+        """
+        Attach to a workspace session
+
+        :param name: Session name
+        """
+        self._tmux.attach(name or self._name)
+
+    def ls(self):
+        """
+        List windows and panes for a session
+        """
+        windows, errors = self._tmux.get_windows(self._name)
+        if errors:
+            raise WorkspaceException('Unable to list windows', errors)
+        log.echo(' :: Windows:')
+        log.echo(repr(windows))
+
+        for window in windows:
+            win_id = window['window_id']
+            panes, errors = self._tmux.get_panes(self._name, win_id)
+            if errors:
+                raise WorkspaceException('Unable to list panes', errors)
+            log.echo(' :: Window "{}" panes:'.format(win_id))
+            log.echo(repr(panes))
 
     def create_window(self, name, panes, post_cmds, layout=None):
         """
@@ -90,10 +129,10 @@ class Workspace(object):
         :return
         """
         if len(self._windows) > 0:
-            window, pane = self._tmux.new_window(self._session['name'], name)
+            window, pane = self._tmux.new_window(self._name, name)
         else:
             self._session, window, pane = \
-                self._tmux.new_session(self._config.get('name'), name)
+                self._tmux.new_session(self._name, name)
             if not self._session:
                 print('Error creating session buddy.')
                 sys.exit(1)
@@ -114,10 +153,3 @@ class Workspace(object):
 
         self._tmux.set_layout(session_name, name, layout)
         return window
-
-
-class WorkspaceException(Exception):
-    def __init__(self, message, errors=''):
-        super(WorkspaceException, self).__init__(message)
-        self.errors = errors
-        self.message = message
