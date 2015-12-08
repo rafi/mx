@@ -144,12 +144,13 @@ class Git(object):
                 '--format=%C(auto)%D %C(black bold)(%aN %ar)%Creset'
             ]).decode('utf-8').strip()
 
-            position = ''
-            if not detached:
+            if detached:
+                position = 'detach'
+            else:
                 output = subprocess.check_output([
                     'git', 'rev-parse', '--abbrev-ref', 'HEAD'])
                 branch = output.decode('utf-8').strip()
-                upstream = None
+                upstream = 'origin/{}'.format(branch)
                 try:
                     output = subprocess.check_output(
                         ['git', 'rev-parse', '--abbrev-ref', '@{upstream}'],
@@ -158,23 +159,24 @@ class Git(object):
                 except subprocess.CalledProcessError:
                     pass
 
-                if not upstream:
-                    upstream = 'origin/{}'.format(branch)
-
-                output = subprocess.check_output([
-                    'git', 'rev-list', '--left-right',
-                    branch, '...', upstream
-                ]).decode('utf-8')
-                ahead = len(re.findall(r'\<', output))
-                behind = len(re.findall(r'\>', output))
-                position = '{}{}'.format(
-                    '▲' + str(ahead) if ahead else '',
-                    '▼' + str(behind) if behind else '',
-                )
+                position = ''
+                try:
+                    output = subprocess.check_output([
+                        'git', 'rev-list', '--left-right',
+                        branch, '...', upstream
+                    ], stderr=subprocess.STDOUT).decode('utf-8')
+                    ahead = len(re.findall(r'\<', output))
+                    behind = len(re.findall(r'\>', output))
+                    position = '{}{}'.format(
+                        '▲' + str(ahead) if ahead else '',
+                        '▼' + str(behind) if behind else '',
+                    )
+                except subprocess.CalledProcessError:
+                    position = 'n/a'
 
             log.echo('   [white]{:>30} '
                      ' [boldred]{:3} [boldblue]{:3} [boldmagenta]{:7}'
                      ' [reset]{}'
                      .format(
                          repo['name'], modified, untracked,
-                         position if not detached else 'detach', current))
+                         position, current))
