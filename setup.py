@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from src import mx
 
 MAJOR_VERSION = '0'
 MINOR_VERSION = '2'
@@ -6,22 +7,23 @@ MICRO_VERSION = '5'
 VERSION = '{}.{}.{}'.format(MAJOR_VERSION, MINOR_VERSION, MICRO_VERSION)
 
 setup(
-    name='mux2',
+    name='mx',
     version=VERSION,
+    description='Project-oriented tmux/git personal assistant.',
+    long_description=mx.__doc__,
+    author=mx.__author__,
+    author_email=mx.__email__,
+    license=mx.__license__,
+    url='http://github.com/rafi/mx',
+    keywords='tmux git workspace project assistant',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     install_requires=['PyYAML'],
     extras_requires=['pytest', 'mock'],
     platforms='any',
-    author='Rafael Bodill',
-    author_email='justrafi@gmail.com',
-    description='Workspace/project-oriented tmux/git personal assistant.',
-    license='MIT',
-    keywords='tmux git workspace project assistant',
-    url='http://github.com/rafi/mux2',
     zip_safe=False,
     entry_points={
-        'console_scripts': ['mux = mux.cli:main']
+        'console_scripts': ['mx = mx.cli:main']
     },
     classifiers=[
         'Development Status :: 3 - Alpha',

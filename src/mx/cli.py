@@ -19,15 +19,15 @@ def main():
     Start main program: Parse user arguments and take action
     """
     parser = argparse.ArgumentParser(
-        description='mux: Orchestrate tmux sessions')
+        description='mx: Orchestrate tmux sessions and git projects')
 
     parser.add_argument('action', type=str, default='start',
                         choices=TMUX_COMMANDS + GIT_COMMANDS,
                         help='an action for %(prog)s (default: %(default)s)')
     parser.add_argument('session', type=str, nargs='?',
                         help='session for %(prog)s to load'
-                        ' (default: current directory\'s mux.yml)')
-    parser.add_argument('--config', type=str, default='mux.yml',
+                        ' (default: current directory\'s .mx.yml)')
+    parser.add_argument('--config', type=str, default='.mx.yml',
                         help='workspace yml config file'
                              ' (default: %(default)s)')
     parser.add_argument('-v', action='version',
@@ -38,7 +38,7 @@ def main():
     # Compute cache pool path
     cache_dir = os.environ.get('XDG_CACHE_HOME',
                                os.path.join(os.environ.get('HOME'), '.cache'))
-    pool_dir = os.path.join(cache_dir, 'mux')
+    pool_dir = os.path.join(cache_dir, 'mx')
 
     if args.session:
         # Load session from cache pool (symlinks)
