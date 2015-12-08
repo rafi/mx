@@ -7,9 +7,9 @@ MICRO_VERSION = '5'
 VERSION = '{}.{}.{}'.format(MAJOR_VERSION, MINOR_VERSION, MICRO_VERSION)
 
 setup(
-    name='mx',
+    name='rafi.mx',
     version=VERSION,
-    description='Project-oriented tmux/git personal assistant.',
+    description='Workspace/project-oriented tmux/git personal assistant.',
     long_description=mx.__doc__,
     author=mx.__author__,
     author_email=mx.__email__,

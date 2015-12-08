@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Project-oriented tmux/git personal assistant.
+"""Workspace/project-oriented tmux/git personal assistant.
 
-Lorem ipsum.
+Working on multiple git repositories and juggling tmux sessions can be tedious.
+`mx` tries to help with that.
 """
 __package__ = 'mx'
 __license__ = 'MIT'
