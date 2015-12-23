@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 import yaml
 import argparse
@@ -10,8 +9,8 @@ from .git import Git
 from .tmux import TmuxException
 from .workspace import Workspace, WorkspaceException
 
-TMUX_COMMANDS = ['attach', 'start', 'stop', 'ls']
-GIT_COMMANDS = ['fetch', 'status']
+WORKSPACE_COMMANDS = ['attach', 'start', 'stop', 'ls', 'init']
+GIT_COMMANDS = ['clone', 'fetch', 'status']
 
 
 def main():
@@ -22,7 +21,7 @@ def main():
         description='mx: Orchestrate tmux sessions and git projects')
 
     parser.add_argument('action', type=str, default='start',
-                        choices=TMUX_COMMANDS + GIT_COMMANDS,
+                        choices=WORKSPACE_COMMANDS + GIT_COMMANDS,
                         help='an action for %(prog)s (default: %(default)s)')
     parser.add_argument('session', type=str, nargs='?',
                         help='session for %(prog)s to load'
@@ -49,12 +48,18 @@ def main():
 
     log = Logger()
     if not os.path.isfile(cfg_path):
-        log.echo('[red]ERROR: [reset]Unable to find [white]{}'
-                 .format(cfg_path))
-        sys.exit(2)
+        if args.action == 'init':
+            schema = Workspace.initialize(os.getcwd())
+            with open(cfg_path, 'w') as cfg_file:
+                cfg_file.write(yaml.dump(schema, default_flow_style=False))
+            args.action = 'status'
+        else:
+            log.echo('[red]ERROR: [reset]Unable to find [white]{}'
+                     .format(cfg_path))
+            sys.exit(2)
 
     try:
-        # Read configuration and initiate workspace object
+        # Read configuration and run the requested action
         with open(cfg_path, 'r') as stream:
             config = yaml.load(stream)
         run(config, args.action)
@@ -72,7 +77,7 @@ def main():
         if hasattr(e, 'errors'):
             log.echo('[red]{}: [reset]{}'.format(e.message, e.errors))
         else:
-            log.echo('[red]Error: [reset]{}'.format(str(e)))
+            log.echo('[red]Raw error: [reset]{}'.format(str(e)))
         sys.exit(3)
 
 
@@ -80,7 +85,7 @@ def run(config, action):
     """
     Execute tmux or git workspace related actions
     """
-    if action in TMUX_COMMANDS:
+    if action in WORKSPACE_COMMANDS:
         workspace = Workspace(config)
         getattr(workspace, action)()
 

@@ -19,15 +19,46 @@ class Git(object):
         """
         self._config = config
         self._root = self._config.get('dir') or os.getcwd()
+        self._root = os.path.expanduser(self._root)
 
         # Collect normalized list of repositories in workspace
         for repo_name in self._config.get('repos', []):
-            repo = {
-                'name': repo_name,
-                'url': 'https://github.com/{}.git'.format(repo_name),
-                'dir': repo_name.split('/')[1]
-            }
+            if isinstance(repo_name, str):
+                repo = {
+                    'name': repo_name,
+                    'url': self._parse_repo_url(repo_name),
+                    'dir': repo_name.split('/')[1]
+                }
+            else:
+                repo = repo_name
+
             self._repos.append(repo)
+
+    def _parse_repo_url(self, repo_name):
+        """
+        Complete full URL for short named repositories
+        """
+        url = None
+        if 'github.com' in repo_name:
+            url = 'https://github.com/{}.git'.format(repo_name)
+        return url or repo_name
+
+    def clone(self):
+        """
+        Clone all repositories in project directory
+        """
+        log.echo(' [blue]::[reset] Fetching git index for project at [white]{}'
+                 .format(self._root))
+        if not os.path.isdir(self._root):
+            os.makedirs(self._root)
+        os.chdir(self._root)
+
+        for repo in self._repos:
+            log.echo(' [blue]::[reset] Cloning [white]{} [boldblack]@ {}'
+                     .format(repo['name'], repo['url']))
+            subprocess.check_output(
+                ['git', 'clone', repo['url']],
+                stderr=subprocess.STDOUT)
 
     def fetch(self):
         """
@@ -47,8 +78,7 @@ class Git(object):
             os.chdir(repo['dir'])
             output = subprocess.check_output(
                 ['git', 'fetch', '--all', '--tags', '--prune'],
-                stderr=subprocess.STDOUT
-            )
+                stderr=subprocess.STDOUT)
             self._parse_git_fetch(output.decode('utf_8'))
 
     def _parse_git_fetch(self, output):
@@ -174,9 +204,39 @@ class Git(object):
                 except subprocess.CalledProcessError:
                     position = 'n/a'
 
+            name = repo['name']
+            if repo['name'].split('/')[1] != repo['dir']:
+                name = repo['dir']
+
             log.echo('   [white]{:>30} '
                      ' [boldred]{:3} [boldblue]{:3} [boldmagenta]{:7}'
                      ' [reset]{}'
                      .format(
-                         repo['name'], modified, untracked,
+                         name, modified, untracked,
                          position, current))
+
+    @staticmethod
+    def is_git_repo():
+        """
+        Check if current directory is a Git repository
+        """
+        try:
+            subprocess.check_output(
+                ['git', 'rev-parse', '--is-inside-work-tree'],
+                stderr=subprocess.STDOUT)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    @staticmethod
+    def get_remote_url():
+        """
+        Returns the current directory's Git repository remote URL
+        """
+        try:
+            url = subprocess.check_output(
+                ['git', 'config', '--get', 'remote.origin.url'],
+                stderr=subprocess.STDOUT)
+            return url.decode('utf-8').strip()
+        except subprocess.CalledProcessError:
+            return False

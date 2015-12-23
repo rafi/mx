@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+import re
 import sys
 import os
 from .logger import Logger
 from .tmux import Tmux
+from .git import Git
 
 log = Logger()
 
@@ -32,7 +34,8 @@ class Workspace(object):
     def set_config(self, config):
         self._config = config
         self._name = self._config.get('name')
-        self._root = self._config.get('dir')
+        self._root = self._config.get('dir') or os.getcwd()
+        self._root = os.path.expanduser(self._root)
 
         # Prepare a virtualenv source command, if any
         # The specified virtualenv path can be absolute or relative
@@ -155,3 +158,36 @@ class Workspace(object):
 
         self._tmux.set_layout(session_name, name, layout)
         return window
+
+    @staticmethod
+    def initialize(root_dir):
+        """
+        Initialize a new workspace .mx.yml file
+        """
+        dirs = next(os.walk(root_dir))[1]
+        repos = []
+        skipped = []
+        for directory in dirs:
+            os.chdir(os.path.join(root_dir, directory))
+            if Git.is_git_repo():
+                log.echo(' [blue]::[reset] Found directory'
+                         ' `[white]{}[reset]`'.format(directory))
+                url = Git.get_remote_url()
+                name = url.replace(':', '/')
+                name = re.sub('.git$', '', name)
+                name = '/'.join(name.split('/')[-2:])
+                if name.split('/')[1] == directory:
+                    repos.append(name)
+                else:
+                    repos.append({'dir': directory, 'name': name})
+            else:
+                skipped.append(directory)
+
+        log.echo(' [blue]::[yellow] Skipped[reset]'
+                 ' non-git repositories: {}'.format(', '.join(skipped)))
+
+        return {
+            'name': os.path.basename(root_dir),
+            'dir': root_dir,
+            'repos': repos
+        }
