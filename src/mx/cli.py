@@ -51,7 +51,8 @@ def main():
         if args.action == 'init':
             schema = Workspace.initialize(os.getcwd())
             with open(cfg_path, 'w') as cfg_file:
-                cfg_file.write(yaml.dump(schema, default_flow_style=False))
+                cfg_file.write(
+                    yaml.safe_dump(schema, default_flow_style=False))
             args.action = 'status'
         else:
             log.echo('[red]ERROR: [reset]Unable to find [white]{}'
@@ -72,7 +73,7 @@ def main():
             os.symlink(cfg_path, link)
 
     except (WorkspaceException, TmuxException) as e:
-        if e.__context__:
+        if '__context__' in e and e.__context__:
             log.echo(' -> {}'.format(e.__context__))
         if hasattr(e, 'errors'):
             log.echo('[red]{}: [reset]{}'.format(e.message, e.errors))

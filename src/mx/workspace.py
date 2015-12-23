@@ -179,7 +179,7 @@ class Workspace(object):
                 if name.split('/')[1] == directory:
                     repos.append(name)
                 else:
-                    repos.append({'dir': directory, 'name': name})
+                    repos.append({'dir': directory, 'name': name, 'url': url})
             else:
                 skipped.append(directory)
 

@@ -69,7 +69,9 @@ class Tmux(object):
         """
         try:
             cmds = ['tmux', 'has-session', '-t', session_name]
-            code = subprocess.check_call(cmds, stderr=subprocess.DEVNULL)
+            # Compatibility code, python 2.x doesn't have subprocess.DEVNULL
+            with open(os.devnull, 'wb') as DEVNULL:
+                code = subprocess.check_call(cmds, stderr=DEVNULL)
         except subprocess.CalledProcessError as e:
             code = e.returncode
         return code == 0

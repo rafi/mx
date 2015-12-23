@@ -147,6 +147,9 @@ class Git(object):
                  .format(session_name,
                          '[boldgreen]on' if is_on else '[boldred]off'))
 
+        # Compatibility for python 2.x, doesn't have subprocess.DEVNULL
+        DEVNULL = open(os.devnull, 'wb')
+
         for repo in self._repos:
             os.chdir(self._root)
             os.chdir(repo['dir'])
@@ -154,7 +157,7 @@ class Git(object):
             try:
                 output = subprocess.check_output(
                     ['git', 'symbolic-ref', '-q', 'HEAD'],
-                    stderr=subprocess.DEVNULL)
+                    stderr=DEVNULL)
                 detached = False
             except subprocess.CalledProcessError:
                 detached = True
@@ -165,7 +168,7 @@ class Git(object):
 
             output = subprocess.check_output(
                 ['git', 'ls-files', '--others', '--exclude-standard'],
-                stderr=subprocess.DEVNULL).decode('utf-8')
+                stderr=DEVNULL).decode('utf-8')
             untracked = len(output.split('\n')) - 1
             untracked = '?' + str(untracked) if untracked > 0 else ''
 
@@ -184,7 +187,7 @@ class Git(object):
                 try:
                     output = subprocess.check_output(
                         ['git', 'rev-parse', '--abbrev-ref', '@{upstream}'],
-                        stderr=subprocess.DEVNULL)
+                        stderr=DEVNULL)
                     upstream = output.decode('utf-8').strip()
                 except subprocess.CalledProcessError:
                     pass
@@ -214,6 +217,8 @@ class Git(object):
                      .format(
                          name, modified, untracked,
                          position, current))
+
+        DEVNULL.close()
 
     @staticmethod
     def is_git_repo():

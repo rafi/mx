@@ -22,7 +22,7 @@ class Logger(object):
         """
         for arg in args:
             msg = re.sub(r'\[(bold)?([a-z]+)\]', self._colorize, arg)
-            print(msg, '\x1b[0m')
+            print(''.join([msg, '\x1b[0m']))
 
     def _colorize(self, match):
         if not self._is_tty:
