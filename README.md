@@ -89,15 +89,15 @@ windows:
         - cd tmux
         - cd react
         - cd bootstrap
-- db:
-    layout: even-horizontal
-    panes:
-    - ipython
-    - pgcli:
-      - pgcli -U postgres -h localhost -d funyard
-- box:
-    panes:
-    - eval "$(docker-machine env fun)" && docker-compose up
+  - db:
+      layout: even-horizontal
+      panes:
+      - ipython
+      - pgcli:
+        - pgcli -U postgres -h localhost -d funyard
+  - box:
+      panes:
+      - eval "$(docker-machine env fun)" && docker-compose up
 ```
 
 License
