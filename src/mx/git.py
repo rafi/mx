@@ -31,6 +31,8 @@ class Git(object):
                 }
             else:
                 repo = repo_name
+                if 'url' not in repo:
+                    repo['url'] = self._parse_repo_url(repo['name'])
 
             self._repos.append(repo)
 
@@ -39,7 +41,7 @@ class Git(object):
         Complete full URL for short named repositories
         """
         url = None
-        if 'github.com' in repo_name:
+        if 'github.com' not in repo_name:
             url = 'https://github.com/{}.git'.format(repo_name)
         return url or repo_name
 
