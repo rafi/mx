@@ -20,13 +20,13 @@ def main():
     parser = argparse.ArgumentParser(
         description='mx: Orchestrate tmux sessions and git projects')
 
-    parser.add_argument('action', type=str, default='start',
+    parser.add_argument('action', type=str, nargs='?', default='start',
                         choices=WORKSPACE_COMMANDS + GIT_COMMANDS,
                         help='an action for %(prog)s (default: %(default)s)')
     parser.add_argument('session', type=str, nargs='?',
                         help='session for %(prog)s to load'
                         ' (default: current directory\'s .mx.yml)')
-    parser.add_argument('--config', type=str, default='.mx.yml',
+    parser.add_argument('-c', '--config', type=str, default='.mx.yml',
                         help='workspace yml config file'
                              ' (default: %(default)s)')
     parser.add_argument('-v', action='version',
@@ -73,7 +73,7 @@ def main():
             os.symlink(cfg_path, link)
 
     except (WorkspaceException, TmuxException) as e:
-        if '__context__' in e and e.__context__:
+        if hasattr(e, '__context__') and e.__context__:
             log.echo(' -> {}'.format(e.__context__))
         if hasattr(e, 'errors'):
             log.echo('[red]{}: [reset]{}'.format(e.message, e.errors))

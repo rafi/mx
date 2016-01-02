@@ -27,8 +27,8 @@ pip install --user rafi.mx
 Usage
 ---
 ```sh
-  mx [-h] [--config CONFIG] [-v]
-     {attach,start,stop,ls,fetch,status} [session]
+  mx [-h] [-c CONFIG] [-v]
+          [{attach,start,stop,ls,init,clone,fetch,status}] [session]
 ```
 
 1. In a project, create a `.mx.yml` file, see [config-examples] for reference
@@ -60,6 +60,8 @@ Commands
 - `stop` - Kill the entire Tmux session of a project
 - `attach` - Attach to project
 - `ls` - List a session's windows and panes
+- `init` - Create a new `.mx.yml` project, discovering Git repos as sub-dirs
+- `clone` - Clones all Git repositories in project's root directory
 - `fetch` - Run `git fetch --all --prune --tags` on all git repositories
 - `stats` - Display git repositories' index and dir stats
 

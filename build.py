@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# rafi.mx build script
+# ===
+
 import subprocess
 import re
 

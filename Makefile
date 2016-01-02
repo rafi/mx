@@ -13,6 +13,7 @@ install:
 	python setup.py install
 
 publish: clean
+	python build.py; \
 	python setup.py register sdist upload
 
 test:
