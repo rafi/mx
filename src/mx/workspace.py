@@ -2,6 +2,7 @@
 import re
 import sys
 import os
+import subprocess
 from .logger import Logger
 from .tmux import Tmux
 from .git import Git
@@ -42,6 +43,7 @@ class Workspace(object):
         # to the workspace's root directory.
         venv = self._config.get('venv')
         if venv:
+            venv = os.path.expanduser(venv)
             if self._root and not os.path.isabs(venv):
                 venv = os.path.join(self._root, venv)
             self._venv = [
@@ -58,6 +60,14 @@ class Workspace(object):
                 raise WorkspaceException('Directory does not exist',
                                          self._root)
             os.chdir(self._root)
+
+        # Run commands before spawning windows
+        for cmd in self._config.get('commands', []):
+            retcode, stdout = subprocess.getstatusoutput(cmd)
+            if retcode != 0:
+                raise WorkspaceException(
+                    'Error {} while running `{}`'.format(retcode, cmd), stdout)
+
         for window in self._config.get('windows', []):
             # Normalize window schema definition, a window definition:
             #   - string - window name

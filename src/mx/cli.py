@@ -69,7 +69,7 @@ def main():
         if not os.path.isdir(pool_dir):
             os.makedirs(pool_dir)
         link = os.path.join(pool_dir, '{}.yml'.format(config.get('name')))
-        if not os.path.isfile(link):
+        if not os.path.islink(link):
             os.symlink(cfg_path, link)
 
     except (WorkspaceException, TmuxException) as e:
